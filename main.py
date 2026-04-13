@@ -17,9 +17,11 @@ class Layer:
     def relu_matrix(self, matrix):
         return np.array([self.relu_row(row) for row in matrix])
 
-    def fix_error_last_layer(self, learning_rate, delta, a):
-        self.W = self.W - learning_rate * delta * a
+    def fix_error_last_layer(self, learning_rate, answer_pred, answer_true, x):
+        delta = answer_pred - answer_true
+        self.W = self.W - learning_rate * delta * x
         self.b = self.b - learning_rate * delta
+        return delta
 
     def fix_error(self, learning_rate, W_prev, delta_prev, x):
         delta = (W_prev * delta_prev).T
@@ -28,40 +30,98 @@ class Layer:
         self.W -= learning_rate * delta * x
         self.b -= learning_rate * delta
 
+        return delta
 
-x = np.array([1, 2, 3])
-learning_rate = 0.1
-y_true = 0.5
 
-# 1 слой
-layer1 = Layer(
-    W=np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]),
-    b=np.array([[0.1], [0.2]])
-)
+class LayerWrapper(Layer):
+    def __init__(self, W, b, prev_layer: LayerWrapper | None = None):
+        super().__init__(W, b)
+        self.prev_layer: LayerWrapper | None = prev_layer
 
-z1 = layer1.get_z(x)
-a1 = layer1.relu_matrix(z1).T
+    def fix_error_last_layer_wrapper(self, learning_rate, answer_pred, answer_true, all_x):
+        delta = super().fix_error_last_layer(
+            learning_rate, answer_pred, answer_true, all_x[-1])
+        if not self.prev_layer:
+            return
 
-# 2 слой
-layer2 = Layer(
-    W=np.array([[0.7, 0.8]]),
-    b=np.array([[0.3]])
-)
+        self.prev_layer.fix_error_wrapper(
+            learning_rate, self.W, delta, all_x[0:-1])
 
-z2 = layer2.get_z(a1)
+    def fix_error_wrapper(self, learning_rate, W_prev, delta_prev, all_x):
+        delta = super().fix_error(learning_rate, W_prev, delta_prev, all_x[-1])
+        if not self.prev_layer:
+            return
 
-# ошибка
-# 2 слой
-y_pred = z2
-delta2 = y_pred - y_true
+        self.prev_layer.fix_error_wrapper(
+            learning_rate, self.W, delta, all_x[0:-1])
 
-W2_old = layer2.W
-layer2.fix_error_last_layer(learning_rate, delta2, a1)
 
-# 1 слой
-layer1.fix_error(learning_rate, W2_old, delta2, x)
+class Perceptron:
+    learning_rate = 0.1
+    enter_layer: LayerWrapper
+    hidden_layers: list[LayerWrapper] = []
+    output_layer: LayerWrapper
 
-print(layer1.W)
-print(layer1.b)
-print(layer2.W)
-print(layer2.b)
+    def __init__(self, enter_data_count, enter_neurons_count, hidden_layers_count, output_neurons_count):
+        self.create_layers(enter_data_count, enter_neurons_count,
+                           hidden_layers_count, output_neurons_count)
+
+    def randomize_weights(self, neurons_count, biases_count):
+        return np.random.rand(neurons_count, biases_count)
+
+    def randomize_biases(self, neurons_count):
+        return np.random.rand(neurons_count, 1)
+
+    def create_layers(self, enter_data_count, enter_neurons_count, hidden_layers_count, output_neurons_count):
+        self.enter_layer = LayerWrapper(
+            W=self.randomize_weights(
+                enter_data_count, enter_neurons_count),
+            b=self.randomize_biases(enter_neurons_count)
+        )
+
+        prev_layer = self.enter_layer
+
+        for i in range(hidden_layers_count):
+            prev_layer = LayerWrapper(
+                W=self.randomize_weights(
+                    enter_data_count, enter_neurons_count),
+                b=self.randomize_biases(enter_neurons_count),
+                prev_layer=prev_layer
+            )
+
+            self.hidden_layers.append(prev_layer)
+
+        self.output_layer = LayerWrapper(
+            W=self.randomize_weights(
+                output_neurons_count, 10),
+            b=self.randomize_biases(output_neurons_count),
+            prev_layer=prev_layer
+        )
+
+    def train(self, enter_data, answer_true):
+        all_layers = [self.enter_layer, *self.hidden_layers, self.output_layer]
+        for i in range(100):
+            self.epoch(all_layers, enter_data, answer_true)
+
+    def epoch(self, all_layers, enter_data, answer_true):
+        z = None
+        a = enter_data
+
+        z_array = []
+        a_array = [enter_data]
+
+        for i in range(len(all_layers)):
+            z = all_layers[i].get_z(a_array[i])
+            a = all_layers[i].relu_matrix(z)
+
+            z_array.append(z)
+            a_array.append(a)
+
+        all_layers[-1].fix_error_last_layer_wrapper(
+            self.learning_rate, z_array[-1], answer_true, a_array[0:-1])
+
+
+perc = Perceptron(3, 3, 1, 1)
+enter_data = np.array([1, 2, 3])
+answer_true = np.array([4])
+perc.train(enter_data, answer_true)
