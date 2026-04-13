@@ -2,54 +2,66 @@
 import numpy as np
 
 
-def get_z(W, b, x):
-    z = np.sum(W * x, axis=1, keepdims=True) + b
-    return z
+class Layer:
+    def __init__(self, W, b):
+        self.W = W
+        self.b = b
+
+    def get_z(self, x):
+        z = np.sum(self.W * x, axis=1, keepdims=True) + self.b
+        return z
+
+    def relu_row(self, matrix_row):
+        return np.array([max(0, n) for n in matrix_row])
+
+    def relu_matrix(self, matrix):
+        return np.array([self.relu_row(row) for row in matrix])
+
+    def fix_error_last_layer(self, learning_rate, delta, a):
+        self.W = self.W - learning_rate * delta * a
+        self.b = self.b - learning_rate * delta
+
+    def fix_error(self, learning_rate, W_prev, delta_prev, x):
+        delta = (W_prev * delta_prev).T
+        delta = self.relu_matrix(delta)
+
+        self.W -= learning_rate * delta * x
+        self.b -= learning_rate * delta
 
 
-def get_a(z):
-    a_pre = []
-    for i in range(len(z)):
-        a_pre.append(max(0, z[i]))
-    a = np.array(a_pre).T
-    return a
-
-
-x = [1, 2, 3]
+x = np.array([1, 2, 3])
 learning_rate = 0.1
 y_true = 0.5
 
 # 1 слой
-W1 = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
-b1 = np.array([[0.1], [0.2]])
+layer1 = Layer(
+    W=np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]),
+    b=np.array([[0.1], [0.2]])
+)
 
-z1 = get_z(W1, b1, x)
-a1 = get_a(z1)
+z1 = layer1.get_z(x)
+a1 = layer1.relu_matrix(z1).T
 
 # 2 слой
-W2 = np.array([[0.7, 0.8]])
-b2 = np.array([[0.3]])
+layer2 = Layer(
+    W=np.array([[0.7, 0.8]]),
+    b=np.array([[0.3]])
+)
 
-z2 = get_z(W2, b2, a1)
-print("z2", z2)
+z2 = layer2.get_z(a1)
 
 # ошибка
 # 2 слой
 y_pred = z2
 delta2 = y_pred - y_true
 
-W2_new = W2 - learning_rate * delta2 * a1
-b2_new = b2 - learning_rate * delta2
-
-print("W2_new", W2_new)
-print("b2_new", b2_new)
+W2_old = layer2.W
+layer2.fix_error_last_layer(learning_rate, delta2, a1)
 
 # 1 слой
-delta1 = (W2 * delta2).T
-delta1 = np.array([max(0, delta1[0]), max(0, delta1[1])])
-print("delta1", delta1)
+layer1.fix_error(learning_rate, W2_old, delta2, x)
 
-W1_new = W1 - learning_rate * delta1 * x
-b1_new = b1 - learning_rate * delta1
-print("W1_new", W1_new)
-print("b1_new", b1_new)
+print(layer1.W)
+print(layer1.b)
+print(layer2.W)
+print(layer2.b)
