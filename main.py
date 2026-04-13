@@ -90,9 +90,10 @@ class Perceptron:
             self.layers.append(layer)
             prev_layer = layer
 
-    def train(self, enter_data, answer_true):
-        for i in range(100000):
-            self.epoch(enter_data, answer_true)
+    def train(self, data):
+        for _ in range(70000):
+            for [question, answer] in data:
+                self.epoch(question, answer)
 
     def predict(self, enter_data):
         z = None
@@ -129,10 +130,17 @@ config = [
 ]
 
 perc = Perceptron(config)
-enter_data = np.array([1, 2, 3]).reshape(-1, 1) / 10
+enter_data = [
+    [np.array([1, 2, 3]).reshape(-1, 1) / 10,       np.array([4]) / 10],
+    [np.array([15, 16, 17]).reshape(-1, 1) / 10,    np.array([18]) / 10],
+    [np.array([13, 14, 15]).reshape(-1, 1) / 10,    np.array([16]) / 10],
+    [np.array([5, 6, 7]).reshape(-1, 1) / 10,       np.array([8]) / 10],
+    [np.array([3, 4, 5]).reshape(-1, 1) / 10,       np.array([6]) / 10]
+]
+
 answer_true = np.array([4]) / 10
-perc.train(enter_data, answer_true)
+perc.train(enter_data)
 
 
 output = perc.predict(np.array([2, 3, 4]).reshape(-1, 1) / 10)
-print(output * 10)
+print(output * 10)  # [[5.05463213]]

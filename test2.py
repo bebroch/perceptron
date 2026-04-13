@@ -6,9 +6,7 @@ import numpy as np
 # z = (W @ x) + b.T
 # print(z.T)
 
+data = [{"question": [1, 2, 3], "answer": 4}]
 
-W = np.array([[0.89264443, 0.66256676, 0.62145801],
-              [0.3124453, 0.30763818, 0.15623857]])
-x = np.array([[3.86357196], [1.03383072]])
-
-print(W @ x)
+for question, answer in data:
+    print(question, answer)
