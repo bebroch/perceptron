@@ -16,9 +16,9 @@ class Layer:
         self.b = b
 
     def get_z(self, x):
-        z = np.dot(self.W, x) + self.b
+        z = self.W @ x + self.b.T
         # z = np.sum(self.W * x, axis=1, keepdims=True) + self.b
-        return z
+        return z.T
 
     def get_a(self, z):
         a_pre = []
@@ -44,7 +44,7 @@ class TestMath(unittest.TestCase):
         W = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
         b = np.array([[0.1], [0.2]])
         layer = Layer(W, b)
-        z = layer.get_z([1, 2, 3])
+        z = layer.get_z(np.array([1, 2, 3]))
         equal = np.array_equal(z, np.array([[1.5], [3.4]]))
         self.assertTrue(equal)
 
