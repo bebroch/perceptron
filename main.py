@@ -8,7 +8,6 @@ class Layer:
         self.b = b
 
     def get_z(self, x):
-        print(x)
         z = self.W @ x + self.b
         return z
 
@@ -20,34 +19,16 @@ class Layer:
 
     def fix_error_last_layer(self, learning_rate, answer_pred, answer_true, x):
         delta = answer_pred - answer_true
-        self.W = self.W - learning_rate * delta * x
+        self.W = self.W - learning_rate * np.dot(delta, x.T)
         self.b = self.b - learning_rate * delta
         return delta
 
     def fix_error(self, learning_rate, W_next, delta_next, z_current, prev_input):
-        """
-        Правильное обратное распространение для скрытого слоя
-
-        Параметры:
-        - learning_rate: скорость обучения
-        - W_next: веса следующего слоя
-        - delta_next: ошибка следующего слоя
-        - z_current: выход текущего слоя ДО активации (для производной ReLU)
-        - x_prev: вход текущего слоя (выход предыдущего слоя)
-        """
-        # 1. Вычисляем ошибку текущего слоя
-        delta = np.dot(W_next.T, delta_next)  # Матричное умножение
-
-        # 2. Умножаем на производную функции активации
+        delta = np.dot(W_next.T, delta_next)
         relu_derivative = (z_current > 0).astype(float)
         delta = delta * relu_derivative
-
-        # 3. Обновляем веса (матричное умножение)
         self.W -= learning_rate * np.dot(delta, prev_input.T)
-
-        # 4. Обновляем смещения
         self.b -= learning_rate * delta
-
         return delta
 
 
@@ -81,7 +62,7 @@ class LayerWrapper(Layer):
 
 
 class Perceptron:
-    learning_rate = 0.1
+    learning_rate = 0.01
     layers: list[LayerWrapper] = []
 
     def __init__(self, layers_config):
@@ -92,10 +73,10 @@ class Perceptron:
         self.create_layers(layers_config)
 
     def randomize_weights(self, neurons_count, biases_count):
-        return np.random.rand(neurons_count, biases_count)
+        return np.random.randn(neurons_count, biases_count)
 
     def randomize_biases(self, neurons_count):
-        return np.random.rand(neurons_count, 1)
+        return np.random.randn(neurons_count, 1)
 
     def create_layers(self, layers_config):
         prev_layer = None
@@ -110,8 +91,18 @@ class Perceptron:
             prev_layer = layer
 
     def train(self, enter_data, answer_true):
-        for i in range(1):
+        for i in range(100000):
             self.epoch(enter_data, answer_true)
+
+    def predict(self, enter_data):
+        z = None
+        a = enter_data
+
+        for i in range(len(self.layers)):
+            z = self.layers[i].get_z(a)
+            a = self.layers[i].relu_matrix(z)
+
+        return z
 
     def epoch(self,  enter_data, answer_true):
         z_array = []
@@ -138,6 +129,10 @@ config = [
 ]
 
 perc = Perceptron(config)
-enter_data = np.array([1, 2, 3]).reshape(-1, 1)
-answer_true = np.array([4])
+enter_data = np.array([1, 2, 3]).reshape(-1, 1) / 10
+answer_true = np.array([4]) / 10
 perc.train(enter_data, answer_true)
+
+
+output = perc.predict(np.array([2, 3, 4]).reshape(-1, 1) / 10)
+print(output * 10)
