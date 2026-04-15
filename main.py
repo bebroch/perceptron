@@ -67,7 +67,7 @@ class Perceptron:
 
     def __init__(self, layers_config):
         """
-        layers_config: список кортежей (входные_нейроны, выходные_нейроны)
+        layers_config: список кортежей (нейроны с предыдущего слоя, количество нейронов в текущем слое)
         Пример: [(3, 4), (4, 2), (2, 1)]
         """
         self.create_layers(layers_config)
@@ -90,10 +90,12 @@ class Perceptron:
             self.layers.append(layer)
             prev_layer = layer
 
-    def train(self, data):
-        for _ in range(70000):
+    def train(self, data, epochs=1):
+        for i in range(epochs):
             for [question, answer] in data:
                 self.epoch(question, answer)
+            if i*100 % epochs == 0:
+                print(int(i/epochs*100)+1, "%")
 
     def predict(self, enter_data):
         z = None
@@ -110,7 +112,6 @@ class Perceptron:
         a_array = [enter_data]
 
         for i in range(len(self.layers)):
-
             self.layers[i].current_input = a_array[i]
             z = self.layers[i].get_z(a_array[i])
             a = self.layers[i].relu_matrix(z)
@@ -125,22 +126,36 @@ class Perceptron:
 
 config = [
     (3, 4),   # Входной слой (3 входа -> 4 нейрона)
-    (4, 2),   # Скрытый слой (4 -> 2)
-    (2, 1)    # Выходной слой (2 -> 1)
+    (4, 4),   # Скрытый слой (4 -> 2)
+    (4, 4),   # Скрытый слой (4 -> 2)
+    (4, 4),   # Скрытый слой (4 -> 2)
+    (4, 4)    # Выходной слой (2 -> 1)
 ]
 
 perc = Perceptron(config)
-enter_data = [
-    [np.array([1, 2, 3]).reshape(-1, 1) / 10,       np.array([4]) / 10],
-    [np.array([15, 16, 17]).reshape(-1, 1) / 10,    np.array([18]) / 10],
-    [np.array([13, 14, 15]).reshape(-1, 1) / 10,    np.array([16]) / 10],
-    [np.array([5, 6, 7]).reshape(-1, 1) / 10,       np.array([8]) / 10],
-    [np.array([3, 4, 5]).reshape(-1, 1) / 10,       np.array([6]) / 10]
+
+
+def normalize_data(data):
+    for i in range(len(data)):
+        data[i][0] = np.array(data[i][0]).reshape(-1, 1) / 100
+        data[i][1] = np.array(data[i][1]).reshape(-1, 1) / 100
+    return data
+
+
+data = [
+    [[1, 2, 3],      [4, 5, 6, 7]],
+    [[15, 16, 17],   [18, 19, 20, 21]],
+    [[13, 14, 15],   [16, 17, 18, 19]],
+    [[5, 6, 7],      [8, 9, 10, 11]],
+    [[3, 4, 5],      [6, 7, 8, 9]],
+    [[0, 1, 2],      [3, 4, 5, 6]],
+    [[1, 2, 3],      [4, 5, 6, 7]],
+    [[2, 3, 4],      [5, 6, 7, 8]]
 ]
 
-answer_true = np.array([4]) / 10
-perc.train(enter_data)
+
+perc.train(normalize_data(data), 30000)
 
 
-output = perc.predict(np.array([2, 3, 4]).reshape(-1, 1) / 10)
-print(output * 10)  # [[5.05463213]]
+output = perc.predict(np.array([2, 3, 4]).reshape(-1, 1) / 100)
+print(output * 100)

@@ -1,12 +1,20 @@
 import numpy as np
 
-# W = np.array([[0.1], [0.2], [0.3]])
-# b = np.array([[0.1], [0.2]])
-# x = np.array([1, 2, 3])
-# z = (W @ x) + b.T
-# print(z.T)
 
-data = [{"question": [1, 2, 3], "answer": 4}]
+def normalize_data(data):
+    for i in range(len(data)):
+        data[i][0] = np.array(data[i][0]).reshape(-1, 1) / 10
+        data[i][1] = np.array(data[i][1]).reshape(-1, 1) / 10
+    return data
 
-for question, answer in data:
-    print(question, answer)
+
+data = [
+    [[1, 2, 3],      [4]],
+    [[15, 16, 17],   [18]],
+    [[13, 14, 15],   [16]],
+    [[5, 6, 7],      [8]],
+    [[3, 4, 5],      [6]]
+]
+
+
+print(normalize_data(data))
