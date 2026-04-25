@@ -116,7 +116,7 @@ class Perceptron:
         self.layers.append(layer1)
         self.layers.append(layer2)
 
-    def train(self, train_data: list, epochs=1):
+    def train(self, train_data: list, batch_size: int, epochs=1):
         """
         train_data: [
             [[input_data], [targets]],
@@ -125,7 +125,7 @@ class Perceptron:
         """
 
         def get_batch():
-            return train_data[0:math.ceil(np.size(train_data, 0)*0.2)]
+            return train_data[0:batch_size]
 
         input_start = self.train_data_info["input_data_index"][0]
         input_end = self.train_data_info["input_data_index"][1]
@@ -188,6 +188,20 @@ def normalize_data(data):
     return data / max_normalize_matrix
 
 
+def normalize_output(out):
+    global max_normalize_matrix
+    if max_normalize_matrix is None:
+        raise Exception("max norm must be set")
+    return out * max_normalize_matrix[-1]
+
+
+def normalize_input(input):
+    global max_normalize_matrix
+    if max_normalize_matrix is None:
+        raise Exception("max norm must be set")
+    return input / max_normalize_matrix[0:4]
+
+
 def normalize_train_data(train_data):
     input_data = np.empty((0, len(train_data[0][0])), dtype=float)
     targets = np.empty((0, len(train_data[0][1])), dtype=float)
@@ -223,14 +237,16 @@ layer = get_layer_with_random_weight(neurons_input=2,
 
 
 config = {
-    "learning_rate": 0.5,
+    "learning_rate": 0.001,
     "layers_config": [
-        (2, 3),   # Входной слой (4 входа -> 3 нейрона)
-        (3, 1)    # Выходной слой (3 -> 1)
+        (4, 3),   # Входной слой (4 входа -> 3 нейрона)
+        (3, 10),
+        (10, 10),
+        (10, 1)    # Выходной слой (3 -> 1)
     ],
     "train_data_info": {
-        "input_data_index": (0, 2),
-        "targets_index": (2, 3)
+        "input_data_index": (0, 4),
+        "targets_index": (4, 5)
     }
 }
 
@@ -245,18 +261,21 @@ X = [
     [[12, 13, 14, 15], [16]],
     [[25, 26, 27, 28], [29]],
     [[3, 4, 5, 6], [7]],
+    [[6, 7, 8, 9], [10]],
+    [[8, 9, 10, 11], [12]],
 ]
 
-# training_data = normalize_train_data(X)
-training_data = [
-    np.array([0.2, 0.5, 0.6])
-]
+training_data = normalize_train_data(X)
+# print(training_data)
+# training_data = [
+#     np.array([0.2, 0.5, 0.6])
+# ]
 
 
-perc.train(training_data, epochs=100)
+perc.train(training_data, batch_size=len(training_data), epochs=50000)
 
-# out = perc.predict(np.array([2, 3, 4, 5]))
-# print(out)
+out = perc.predict(normalize_input(np.array([2, 3, 4, 5])))
+print(normalize_output(out))
 
 # X = np.array([[50, 30000], [25, 45000], [30, 75000]], dtype=float)
 # X = normalize_data(X)
