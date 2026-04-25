@@ -85,7 +85,8 @@ class Perceptron:
     def __init__(self, config: dict) -> None:
         self.learning_rate = config["learning_rate"]
         self.train_data_info = config["train_data_info"]
-        self.create_layers()
+        # self.create_layers()
+        self._create_rand_layers(config["layers_config"])
 
     def _create_rand_layers(self, layers_config):
         neurons_input = layers_config[0][0]
@@ -138,7 +139,7 @@ class Perceptron:
 
             for data in batch_data:
                 perceptron_cost = self.epoch(
-                    data[input_start:input_end], data[target_start:target_end])
+                    np.array([data[input_start:input_end]]), np.array([data[target_start:target_end]]))
 
             if (epoch_idx + 1) % max(epochs//10, 1) == 0:
                 print(
@@ -147,7 +148,7 @@ class Perceptron:
     def epoch(self, input_data, target):
         out = input_data
         for layer in self.layers:
-            out = layer.get_a(np.array([out]))
+            out = layer.get_a(out)
 
         self.layers[-1].back_propagation(out - target)
         return (out - target)**2
@@ -252,7 +253,7 @@ training_data = [
 ]
 
 
-perc.train(training_data, epochs=1)
+perc.train(training_data, epochs=100)
 
 # out = perc.predict(np.array([2, 3, 4, 5]))
 # print(out)
