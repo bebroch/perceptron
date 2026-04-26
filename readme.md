@@ -3,7 +3,7 @@
 Запускаем скрипт
 
 ```
-python divisipn_into_classes.py
+python division_into_classes.py
 ```
 
 ЛКМ - поставить красную точку \
