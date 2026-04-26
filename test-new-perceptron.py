@@ -76,6 +76,22 @@ class LayerWrapper(Layer):
         if not prev_layer is None:
             prev_layer.back_propagation(dE_dZ @ old_W.T)
 
+    @staticmethod
+    def get_layer_with_random_weight(
+            neurons_input: int,
+            neurons_out: int,
+            neurons_in_layer: int,
+            prev_layer_of_neurons: int,
+            learning_rate: float,
+            prev_layer: LayerWrapper | None = None):
+        limit = np.sqrt(6 / (neurons_input + neurons_out))
+
+        W = np.random.normal(loc=0, scale=limit, size=(
+            prev_layer_of_neurons, neurons_in_layer))
+        b = np.zeros(shape=(1, neurons_in_layer))
+
+        return LayerWrapper(W=W, b=b, learning_rate=learning_rate, prev_layer=prev_layer)
+
 
 class Perceptron:
     layers: list[LayerWrapper] = []
@@ -95,12 +111,12 @@ class Perceptron:
         prev_layer = None
 
         for _, (weight_length, neuron_length) in enumerate(layers_config):
-            layer = get_layer_with_random_weight(neurons_input=neurons_input,
-                                                 neurons_out=neurons_out,
-                                                 neurons_in_layer=neuron_length,
-                                                 prev_layer_of_neurons=weight_length,
-                                                 learning_rate=0.1,
-                                                 prev_layer=prev_layer)
+            layer = LayerWrapper.get_layer_with_random_weight(neurons_input=neurons_input,
+                                                              neurons_out=neurons_out,
+                                                              neurons_in_layer=neuron_length,
+                                                              prev_layer_of_neurons=weight_length,
+                                                              learning_rate=0.1,
+                                                              prev_layer=prev_layer)
             self.layers.append(layer)
             prev_layer = layer
 
@@ -116,21 +132,26 @@ class Perceptron:
         self.layers.append(layer1)
         self.layers.append(layer2)
 
-    def train(self, train_data: list, batch_size: int, epochs=1):
+    def train(self, train_data: np._ArrayFloat64_co, batch_size: int, epochs=1):
         """
         train_data: [
             [[input_data], [targets]],
             ...
         ]
         """
-
-        def get_batch():
-            return train_data[0:batch_size]
-
         input_start = self.train_data_info["input_data_index"][0]
         input_end = self.train_data_info["input_data_index"][1]
         target_start = self.train_data_info["targets_index"][0]
         target_end = self.train_data_info["targets_index"][1]
+
+        def get_batch():
+            return train_data[0:batch_size]
+
+        def get_input_data(data):
+            return [data[input_start:input_end]]
+
+        def get_targets(data):
+            return [data[target_start:target_end]]
 
         perceptron_cost = None
         for epoch_idx in range(epochs):
@@ -139,7 +160,7 @@ class Perceptron:
 
             for data in batch_data:
                 perceptron_cost = self.epoch(
-                    np.array([data[input_start:input_end]]), np.array([data[target_start:target_end]]))
+                    get_input_data(data), get_targets(data))
 
             if (epoch_idx + 1) % max(epochs//10, 1) == 0:
                 print(
@@ -163,77 +184,50 @@ class Perceptron:
         return out
 
 
-def get_layer_with_random_weight(
-        neurons_input: int,
-        neurons_out: int,
-        neurons_in_layer: int,
-        prev_layer_of_neurons: int,
-        learning_rate: float,
-        prev_layer: LayerWrapper | None = None):
-    limit = np.sqrt(6 / (neurons_input + neurons_out))
+class Normalize:
+    max_normalize_matrix: np._ArrayFloat64_co | None = None
+    input_start: int
+    input_end: int
+    output_start: int
+    output_end: int
 
-    W = np.random.normal(loc=0, scale=limit, size=(
-        prev_layer_of_neurons, neurons_in_layer))
-    b = np.zeros(shape=(1, neurons_in_layer))
+    def __init__(self, input_start, input_end, output_start, output_end) -> None:
+        self.input_start = input_start
+        self.input_end = input_end
+        self.output_start = output_start
+        self.output_end = output_end
 
-    return LayerWrapper(W=W, b=b, learning_rate=learning_rate, prev_layer=prev_layer)
+    def set_max_normalize_matrix_1(self, data):
+        self.max_normalize_matrix = data.max(axis=0)
 
+    def set_max_normalize_matrix_2(self, max_matrix):
+        self.max_normalize_matrix = max_matrix
 
-max_normalize_matrix = None
+    def normalize_data(self, data):
+        return data / self.max_normalize_matrix
 
+    def normalize_output(self, out):
+        max_matrix = self.max_normalize_matrix
+        if max_matrix is None:
+            raise Exception("max norm must be set")
+        return out * max_matrix[-1]
 
-def normalize_data(data):
-    global max_normalize_matrix
-    max_normalize_matrix = data.max(axis=0)
-    return data / max_normalize_matrix
+    def normalize_input(self, input):
+        max_matrix = self.max_normalize_matrix
+        if max_matrix is None:
+            raise Exception("max norm must be set")
+        return input / max_matrix[self.input_start:self.input_end]
 
+    def normalize_train_data(self, input_data, targets):
+        if len(input_data) != len(targets):
+            raise Exception("len(input_data) != len(targets)")
 
-def normalize_output(out):
-    global max_normalize_matrix
-    if max_normalize_matrix is None:
-        raise Exception("max norm must be set")
-    return out * max_normalize_matrix[-1]
+        train_data = np.hstack([input_data, targets], dtype=float)
 
+        if self.max_normalize_matrix is None:
+            self.set_max_normalize_matrix_1(train_data)
 
-def normalize_input(input):
-    global max_normalize_matrix
-    if max_normalize_matrix is None:
-        raise Exception("max norm must be set")
-    return input / max_normalize_matrix[0:4]
-
-
-def normalize_train_data(train_data):
-    input_data = np.empty((0, len(train_data[0][0])), dtype=float)
-    targets = np.empty((0, len(train_data[0][1])), dtype=float)
-
-    for row in train_data:
-        input_data = np.vstack([input_data, row[0]])
-
-    for row in train_data:
-        targets = np.vstack([targets, row[1]])
-
-    train_data = np.hstack([input_data, targets])
-
-    return normalize_data(train_data)
-
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
-def layer_handler(W, b, x):
-    return sigmoid(x @ W + b)
-
-
-def cost_func():
-    pass
-
-
-layer = get_layer_with_random_weight(neurons_input=2,
-                                     neurons_out=1,
-                                     neurons_in_layer=3,
-                                     prev_layer_of_neurons=2,
-                                     learning_rate=0.1)
+        return self.normalize_data(train_data)
 
 
 config = {
@@ -252,61 +246,45 @@ config = {
 
 
 perc = Perceptron(config)
+normalizer = Normalize(input_start=0,
+                       input_end=4,
+                       output_start=4,
+                       output_end=5)
 
-X = [
-    [[1, 2, 3, 4], [5]],
-    [[10, 11, 12, 13], [14]],
-    [[5, 6, 7, 8], [9]],
-    [[15, 16, 17, 18], [19]],
-    [[12, 13, 14, 15], [16]],
-    [[25, 26, 27, 28], [29]],
-    [[3, 4, 5, 6], [7]],
-    [[6, 7, 8, 9], [10]],
-    [[8, 9, 10, 11], [12]],
+input_data = [
+    [1, 2, 3, 4],
+    [10, 11, 12, 13],
+    [5, 6, 7, 8],
+    [15, 16, 17, 18],
+    [12, 13, 14, 15],
+    [25, 26, 27, 28],
+    [3, 4, 5, 6],
+    [6, 7, 8, 9],
+    [8, 9, 10, 11],
 ]
 
-training_data = normalize_train_data(X)
-# print(training_data)
-# training_data = [
-#     np.array([0.2, 0.5, 0.6])
-# ]
+targets = [
+    [5],
+    [14],
+    [9],
+    [19],
+    [16],
+    [29],
+    [7],
+    [10],
+    [12],
+]
+
+# normalizer.set_max_normalize_matrix_2(np.array([10, 100, 100, 100, 100]))
+
+training_data: np._ArrayFloat64_co = normalizer.normalize_train_data(
+    input_data, targets)
+
+print(training_data)
+
+perc.train(training_data, batch_size=len(training_data), epochs=5)
 
 
-perc.train(training_data, batch_size=len(training_data), epochs=50000)
-
-out = perc.predict(normalize_input(np.array([2, 3, 4, 5])))
-print(normalize_output(out))
-
-# X = np.array([[50, 30000], [25, 45000], [30, 75000]], dtype=float)
-# X = normalize_data(X)
-
-# W1 = np.array([[0.8, -0.5, 0.3], [-0.2, 0.6, -0.9]])
-# W2 = np.array([[0.4], [-0.3], [0.7]])
-# b1 = np.array([[0.01, 0.01, 0.01]])
-# b2 = np.array([[0.01]])
-
-# learning_rate = 0.5
-
-# layer1 = LayerWrapper(W=W1, b=b1, learning_rate=learning_rate)
-# layer2 = LayerWrapper(
-#     W=W2, b=b2, learning_rate=learning_rate, prev_layer=layer1)
-
-# x = np.array([[0.2, 0.5]])
-# print(x)
-
-# out1 = layer1.get_a(x)
-# print("out1", out1)
-# out2 = layer2.get_a(out1)
-# print("out2", out2)
-
-# x1 = layer_handler(W1, b1, x)
-# print("x1", x1)
-# x2 = layer_handler(W2, b2, x1)
-# print("x2", x2)
-
-# layer2.back_propagation(out2 - 0.6)
-# print("W2", layer2.W)
-# print("b2", layer2.b)
-
-# print("W1", layer1.W)
-# print("b1", layer1.b)
+input_data = normalizer.normalize_input(np.array([2, 3, 4, 5]))
+out = perc.predict(input_data)
+print(normalizer.normalize_output(out))
