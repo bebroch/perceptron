@@ -92,13 +92,11 @@ class LayerWrapper(Layer):
 
 
 class Perceptron:
-    layers: list[LayerWrapper] = []
-    learning_rate: float
-    train_data_info: dict
-
     def __init__(self, config: dict) -> None:
-        self.learning_rate = config["learning_rate"]
-        self.train_data_info = config["train_data_info"]
+        self.layers: list[LayerWrapper] = []
+
+        self.learning_rate: float = config["learning_rate"]
+        self.train_data_info: dict = config["train_data_info"]
         # self.create_layers()
         self._create_rand_layers(config["layers_config"])
 
@@ -174,8 +172,10 @@ class Perceptron:
         self.layers[-1].back_propagation(out - target)
         return (out - target)**2
 
-    def cost_func(self, data):
-        pass
+    def cost_func(self, input_data, target):
+        predict = self.predict(input_data)
+        cost = (predict - target)**2
+        return cost[0][0]
 
     def predict(self, predict_data):
         out = predict_data
@@ -185,13 +185,15 @@ class Perceptron:
 
 
 class Normalize:
-    max_normalize_matrix: np._ArrayFloat64_co | None = None
+    max_normalize_matrix: np._ArrayFloat64_co | None
     input_start: int
     input_end: int
     output_start: int
     output_end: int
 
     def __init__(self, input_start, input_end, output_start, output_end) -> None:
+        self.max_normalize_matrix = None
+
         self.input_start = input_start
         self.input_end = input_end
         self.output_start = output_start
@@ -211,6 +213,12 @@ class Normalize:
         if max_matrix is None:
             raise Exception("max norm must be set")
         return out * max_matrix[-1]
+
+    def normalize_target(self, target):
+        max_matrix = self.max_normalize_matrix
+        if max_matrix is None:
+            raise Exception("max norm must be set")
+        return target / max_matrix[-1]
 
     def normalize_input(self, input):
         max_matrix = self.max_normalize_matrix
