@@ -1,5 +1,3 @@
-
-
 from perceptron import Normalize, Perceptron
 import numpy as np
 import numpy as np

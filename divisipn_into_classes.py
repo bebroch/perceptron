@@ -15,7 +15,7 @@ def train_perc():
         targets.append([id])
 
     normalized_data = normalizer.normalize_train_data(input_data, targets)
-    perc.train(normalized_data, batch_size=len(normalized_data), epochs=10)
+    perc.train(normalized_data, batch_size=len(normalized_data), epochs=500)
 
 
 perceptron_points = []
@@ -38,12 +38,9 @@ def construct_curve():
         fig.canvas.draw_idle()
 
     delete_last_perceptron_points()
-    for x in np.arange(0, 11., 0.2):
-        for y in np.arange(0, 11., 0.2):
+    for x in np.arange(0, 11., 0.1):
+        for y in np.arange(0, 11., 0.1):
             predict = perc.predict(normalizer.normalize_input([x, y]))
-            num = predict[0][0]
-
-            # ax.plot(x, y, 'o', color=(num, num, num))
 
             if abs(predict - 0.5) <= 0.1:
                 ax.plot(x, y, 'ko')
@@ -54,29 +51,22 @@ def on_click(event):
         return
 
     x, y = event.xdata, event.ydata
-    id_class = None
 
     if event.button is MouseButton.LEFT:
         clicked_points.append((x, y, 1))
         print(f"[ЛКМ] Добавлена точка: ({x:.2f}, {y:.2f})")
         ax.plot(x, y, 'ro')
         fig.canvas.draw_idle()
-        id_class = 1
 
     elif event.button is MouseButton.RIGHT:
         clicked_points.append((x, y, 0))
         print(f"[ПКМ] Добавлена точка: ({x:.2f}, {y:.2f})")
         ax.plot(x, y, 'bo')
         fig.canvas.draw_idle()
-        id_class = 0
 
     elif event.button is MouseButton.MIDDLE:
-        print(
-            f"[СКМ] Проверка точки: ({x:.2f}, {y:.2f}), результат: {perc.predict(normalizer.normalize_input([x, y]))[0]}")
-
-    if not id_class is None:
         train_perc()
-    construct_curve()
+        construct_curve()
 
 
 normalizer = Normalize(input_start=0,
@@ -91,9 +81,9 @@ config = {
     "learning_rate": 0.1,
     "layers_config": [
         (2, 3),
-        (3, 3),
-        (3, 3),
-        (3, 1)
+        (3, 10),
+        (10, 10),
+        (10, 1)
     ],
     "train_data_info": {
         "input_data_index": (0, 2),
