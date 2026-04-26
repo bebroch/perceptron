@@ -148,10 +148,10 @@ class Perceptron:
             return train_data[0:batch_size]
 
         def get_input_data(data):
-            return [data[input_start:input_end]]
+            return np.array([data[input_start:input_end]])
 
         def get_targets(data):
-            return [data[target_start:target_end]]
+            return np.array([data[target_start:target_end]])
 
         perceptron_cost = None
         for epoch_idx in range(epochs):
@@ -163,8 +163,10 @@ class Perceptron:
                     get_input_data(data), get_targets(data))
 
             if (epoch_idx + 1) % max(epochs//10, 1) == 0:
+                if perceptron_cost is None:
+                    raise Exception("perceptron_cost is None")
                 print(
-                    f"{epoch_idx + 1}/{epochs} epochs done, cost = {perceptron_cost}")
+                    f"{epoch_idx + 1}/{epochs} epochs done, cost = {perceptron_cost[0][0]}")
 
     def epoch(self, input_data, target):
         out = input_data
@@ -231,12 +233,11 @@ class Normalize:
 
 
 config = {
-    "learning_rate": 0.001,
+    "learning_rate": 0.002,
     "layers_config": [
         (4, 3),   # Входной слой (4 входа -> 3 нейрона)
-        (3, 10),
-        (10, 10),
-        (10, 1)    # Выходной слой (3 -> 1)
+        (3, 5),
+        (5, 1)    # Выходной слой (3 -> 1)
     ],
     "train_data_info": {
         "input_data_index": (0, 4),
@@ -280,9 +281,8 @@ targets = [
 training_data: np._ArrayFloat64_co = normalizer.normalize_train_data(
     input_data, targets)
 
-print(training_data)
 
-perc.train(training_data, batch_size=len(training_data), epochs=5)
+perc.train(training_data, batch_size=len(training_data), epochs=20000)
 
 
 input_data = normalizer.normalize_input(np.array([2, 3, 4, 5]))
