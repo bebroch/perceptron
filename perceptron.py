@@ -1,178 +1,230 @@
 import numpy as np
-import json
 
 
 class Layer:
+    W: np._ArrayFloat64_co
+    b: np._ArrayFloat64_co
+
     def __init__(self, W, b):
         self.W = W
         self.b = b
 
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+
     def get_z(self, x):
-        z = self.W @ x + self.b
-        return z
+        return x @ self.W + self.b
 
-    def relu_matrix(self, matrix):
-        return np.maximum(0, matrix)
-
-    def fix_error_last_layer(self, learning_rate, answer_pred, answer_true, x):
-        delta = answer_pred - answer_true
-        self.W = self.W - learning_rate * np.dot(delta, x.T)
-        self.b = self.b - learning_rate * delta
-        return delta
-
-    def fix_error(self, learning_rate, W_next, delta_next, z_current, prev_input):
-        delta = np.dot(W_next.T, delta_next)
-        relu_derivative = (z_current > 0).astype(np.float32)
-        delta = delta * relu_derivative
-        self.W -= learning_rate * np.dot(delta, prev_input.T)
-        self.b -= learning_rate * delta
-        return delta
+    def get_a(self, x):
+        """а = σ(z) = σ(W*x + b)"""
+        return self.sigmoid(self.get_z(x))
 
 
 class LayerWrapper(Layer):
-    current_input = None
-    z_current = None
+    prev_layer: LayerWrapper | None
+    current_a: np._ArrayFloat64_co | None
+    prev_a: np._ArrayFloat64_co | None
+    prev_a: np._ArrayFloat64_co | None
+    learning_rate: int
 
-    def __init__(self, W, b, prev_layer: LayerWrapper | None = None):
+    def __init__(self, W, b, learning_rate, prev_layer: LayerWrapper | None = None):
         super().__init__(W, b)
-        self.prev_layer: LayerWrapper | None = prev_layer
+        self.prev_layer = prev_layer
+        self.learning_rate = learning_rate
+        self.current_a = None
 
-    def fix_error_last_layer_wrapper(self, learning_rate, answer_pred, answer_true):
-        delta = super().fix_error_last_layer(
-            learning_rate, answer_pred, answer_true, self.current_input)
+    def get_a(self, x) -> np._ArrayFloat64_co:
+        self.prev_a = x
+        current_a = super().get_a(x)
+        self.current_a = current_a
+        return current_a
 
-        if not self.prev_layer:
-            return
+    def find_error(self, dE_dy_pred):
+        current_a = self.current_a
+        if current_a is None:
+            raise Exception("current_a is must be set")
 
-        self.prev_layer.fix_error_wrapper(
-            learning_rate, self.W, delta)
+        dy_pred_dZ = current_a * (1 - current_a)
+        dE_dZ = dE_dy_pred * dy_pred_dZ
+        return dE_dZ
 
-    def fix_error_wrapper(self, learning_rate, W_next, delta_next):
-        delta = super().fix_error(learning_rate, W_next,
-                                  delta_next, self.z_current, self.current_input)
+    def find_deviation(self, dE_dZ):
+        prev_a = self.prev_a
+        if prev_a is None:
+            raise Exception("current_a is must be set")
 
-        if not self.prev_layer:
-            return
+        dE_dW = prev_a.T @ dE_dZ
+        dE_db = dE_dZ
+        return (dE_dW, dE_db)
 
-        self.prev_layer.fix_error_wrapper(
-            learning_rate, self.W, delta)
+    def fix_error(self, dE_dW, dE_db):
+        W = self.W
+        b = self.b
+        self.W = W - self.learning_rate * dE_dW
+        self.b = b - self.learning_rate * dE_db
+
+    def back_propagation(self, dE_dy_pred):
+        """dE_dy_pred = y_pred - y_true"""
+        old_W = self.W
+        dE_dZ = self.find_error(dE_dy_pred)
+        (dE_dW, dE_db) = self.find_deviation(dE_dZ)
+        self.fix_error(dE_dW, dE_db)
+
+        prev_layer = self.prev_layer
+        if not prev_layer is None:
+            prev_layer.back_propagation(dE_dZ @ old_W.T)
+
+    @staticmethod
+    def get_layer_with_random_weight(
+            neurons_input: int,
+            neurons_out: int,
+            neurons_in_layer: int,
+            prev_layer_of_neurons: int,
+            learning_rate: float,
+            prev_layer: LayerWrapper | None = None):
+        limit = np.sqrt(6 / (neurons_input + neurons_out))
+
+        W = np.random.normal(loc=0, scale=limit, size=(
+            prev_layer_of_neurons, neurons_in_layer))
+        b = np.zeros(shape=(1, neurons_in_layer))
+
+        return LayerWrapper(W=W, b=b, learning_rate=learning_rate, prev_layer=prev_layer)
 
 
 class Perceptron:
     layers: list[LayerWrapper] = []
     learning_rate: float
+    train_data_info: dict
 
-    def __init__(self, config: dict):
-        """
-        layers_config: конфигурация сети
-            learning_rate: скорость обучения
-            neurons_config:
-                список кортежей (нейроны с предыдущего слоя, количество нейронов в текущем слое)
-                Пример: [(3, 4), (4, 2), (2, 1)]
-        model_data: данные о слоях сети
-            learning_rate: скорость обучения
-            layers_data: список кортежей (W, b)
-        """
+    def __init__(self, config: dict) -> None:
+        self.learning_rate = config["learning_rate"]
+        self.train_data_info = config["train_data_info"]
+        # self.create_layers()
+        self._create_rand_layers(config["layers_config"])
 
-        if "layers_config" in config:
-            self.learning_rate = config["layers_config"]["learning_rate"]
-            self.create_rand_layers(config["layers_config"]["neurons_config"])
-        elif "model_data" in config:
-            self.learning_rate = config["model_data"]["learning_rate"]
-            self.create_layers(config["model_data"]["layers_data"])
+    def _create_rand_layers(self, layers_config):
+        neurons_input = layers_config[0][0]
+        neurons_out = layers_config[-1][1]
 
-    def randomize_weights(self, output_size, input_size):
-        return np.random.randn(output_size, input_size) * np.sqrt(2.0 / input_size)
-
-    def randomize_biases(self, neurons_count):
-        return np.random.randn(neurons_count, 1)
-
-    def create_rand_layers(self, layers_config):
         prev_layer = None
 
-        for _, (input_size, output_size) in enumerate(layers_config):
-            layer = LayerWrapper(
-                W=self.randomize_weights(output_size, input_size),
-                b=self.randomize_biases(output_size),
-                prev_layer=prev_layer
-            )
+        for _, (weight_length, neuron_length) in enumerate(layers_config):
+            layer = LayerWrapper.get_layer_with_random_weight(neurons_input=neurons_input,
+                                                              neurons_out=neurons_out,
+                                                              neurons_in_layer=neuron_length,
+                                                              prev_layer_of_neurons=weight_length,
+                                                              learning_rate=0.1,
+                                                              prev_layer=prev_layer)
             self.layers.append(layer)
             prev_layer = layer
 
-    def create_layers(self, layers_data):
-        prev_layer = None
+    def create_layers(self):
+        W1 = np.array([[0.8, -0.5, 0.3], [-0.2, 0.6, -0.9]])
+        W2 = np.array([[0.4], [-0.3], [0.7]])
+        b1 = np.array([[0.01, 0.01, 0.01]])
+        b2 = np.array([[0.01]])
+        layer1 = LayerWrapper(W=W1, b=b1, learning_rate=0.5)
+        layer2 = LayerWrapper(
+            W=W2, b=b2, learning_rate=0.5, prev_layer=layer1)
 
-        for layer_data in layers_data:
-            layer = LayerWrapper(
-                W=layer_data[0],
-                b=layer_data[1],
-                prev_layer=prev_layer
-            )
-            self.layers.append(layer)
-            prev_layer = layer
+        self.layers.append(layer1)
+        self.layers.append(layer2)
 
-    def train(self, data, epochs=1):
+    def train(self, train_data: np._ArrayFloat64_co, batch_size: int, epochs=1):
+        """
+        train_data: [
+            [[input_data], [targets]],
+            ...
+        ]
+        """
+        input_start = self.train_data_info["input_data_index"][0]
+        input_end = self.train_data_info["input_data_index"][1]
+        target_start = self.train_data_info["targets_index"][0]
+        target_end = self.train_data_info["targets_index"][1]
+
+        def get_batch():
+            return train_data[0:batch_size]
+
+        def get_input_data(data):
+            return np.array([data[input_start:input_end]])
+
+        def get_targets(data):
+            return np.array([data[target_start:target_end]])
+
+        perceptron_cost = None
         for epoch_idx in range(epochs):
-            np.random.shuffle(data)                    # важно! перемешиваем
-            for item in data:
-                points = item[0]                       # (n_points, 3)
-                for point in points:                   # берём по одной точке
-                    x = point[:2].reshape(2, 1)        # вход: (2, 1)
-                    y_true = point[2].reshape(1, 1)    # метка: (1, 1)
-                    self.epoch(x, y_true)
+            np.random.shuffle(train_data)
+            batch_data = get_batch()
+
+            for data in batch_data:
+                perceptron_cost = self.epoch(
+                    get_input_data(data), get_targets(data))
 
             if (epoch_idx + 1) % max(epochs//10, 1) == 0:
-                print(f"{epoch_idx + 1}/{epochs} epochs done")
+                if perceptron_cost is None:
+                    raise Exception("perceptron_cost is None")
+                print(
+                    f"{epoch_idx + 1}/{epochs} epochs done, cost = {perceptron_cost[0][0]}")
 
-    def epoch(self,  enter_data, answer_true):
-        z = None
-        a = enter_data
-
-        for i in range(len(self.layers)):
-            self.layers[i].current_input = a
-            z = self.layers[i].get_z(a)
-
-            if i == len(self.layers) - 1:
-                z_clipped = np.clip(z, -500, 500)
-                a = 1 / (1 + np.exp(-z_clipped))
-            else:
-                a = self.layers[i].relu_matrix(z)
-
-            self.layers[i].z_current = z
-
-        self.layers[-1].fix_error_last_layer_wrapper(
-            self.learning_rate, a, answer_true)
-
-    def predict(self, enter_data):
-        z = None
-        a = enter_data
-
-        for i in range(len(self.layers)):
-            z = self.layers[i].get_z(a)
-            a = self.layers[i].relu_matrix(z)
-
-        return z
-
-    def save(self, path):
-        obj = []
+    def epoch(self, input_data, target):
+        out = input_data
         for layer in self.layers:
-            obj.append((layer.W.tolist(), layer.b.tolist()))
-        with open(path, "w") as file:
-            file.write(json.dumps(
-                {"learning_rate": self.learning_rate, "layers_data": obj}))
+            out = layer.get_a(out)
 
-    @staticmethod
-    def load(path):
-        loaded_model = None
-        with open(path, "r") as file:
-            loaded_model = json.loads(file.read())
+        self.layers[-1].back_propagation(out - target)
+        return (out - target)**2
 
-        model_data = {
-            "learning_rate": loaded_model["learning_rate"],
-            "layers_data": []
-        }
-        for layer in loaded_model["layers_data"]:
-            model_data["layers_data"].append(
-                (np.array(layer[0]), np.array(layer[1])))
+    def cost_func(self, data):
+        pass
 
-        return Perceptron({"model_data": model_data})
+    def predict(self, predict_data):
+        out = predict_data
+        for layer in self.layers:
+            out = layer.get_a(out)
+        return out
+
+
+class Normalize:
+    max_normalize_matrix: np._ArrayFloat64_co | None = None
+    input_start: int
+    input_end: int
+    output_start: int
+    output_end: int
+
+    def __init__(self, input_start, input_end, output_start, output_end) -> None:
+        self.input_start = input_start
+        self.input_end = input_end
+        self.output_start = output_start
+        self.output_end = output_end
+
+    def set_max_normalize_matrix_1(self, data):
+        self.max_normalize_matrix = data.max(axis=0)
+
+    def set_max_normalize_matrix_2(self, max_matrix):
+        self.max_normalize_matrix = max_matrix
+
+    def normalize_data(self, data):
+        return data / self.max_normalize_matrix
+
+    def normalize_output(self, out):
+        max_matrix = self.max_normalize_matrix
+        if max_matrix is None:
+            raise Exception("max norm must be set")
+        return out * max_matrix[-1]
+
+    def normalize_input(self, input):
+        max_matrix = self.max_normalize_matrix
+        if max_matrix is None:
+            raise Exception("max norm must be set")
+        return input / max_matrix[self.input_start:self.input_end]
+
+    def normalize_train_data(self, input_data, targets):
+        if len(input_data) != len(targets):
+            raise Exception("len(input_data) != len(targets)")
+
+        train_data = np.hstack([input_data, targets], dtype=float)
+
+        if self.max_normalize_matrix is None:
+            self.set_max_normalize_matrix_1(train_data)
+
+        return self.normalize_data(train_data)
