@@ -1,7 +1,8 @@
 import numpy as np
-from perceptron import Normalize, Perceptron
+from perceptron import Normalize, Perceptron, TrainData
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
+from perceptron import Config, LayersConfig, Normalize, Perceptron,  TrainInfo
 
 clicked_points = []
 
@@ -15,7 +16,13 @@ def train_perc():
         targets.append([id])
 
     normalized_data = normalizer.normalize_train_data(input_data, targets)
-    perc.train(normalized_data, batch_size=len(normalized_data), epochs=500)
+
+    training_data: TrainData = TrainData(
+        data=normalized_data,
+        batch_size=len(normalized_data)
+    )
+
+    perc.train(training_data, epochs=500)
 
 
 perceptron_points = []
@@ -77,19 +84,22 @@ normalizer = Normalize(input_start=0,
 normalizer.set_max_normalize_matrix_2(np.array([10, 10, 1]))
 
 
-config = {
-    "learning_rate": 0.1,
-    "layers_config": [
-        (2, 3),
-        (3, 10),
-        (10, 10),
-        (10, 1)
-    ],
-    "train_data_info": {
-        "input_data_index": (0, 2),
-        "targets_index": (2, 3)
-    }
-}
+config: Config = Config(
+    learning_rate=0.1,
+    layers_config=LayersConfig(
+        layers_config=[
+            (2, 3),
+            (3, 10),
+            (10, 10),
+            (10, 1)
+        ],
+        scale=1.0),
+    train_data_info=TrainInfo(
+        input_data_index=(0, 2),
+        targets_index=(2, 3)
+    )
+)
+
 
 perc = Perceptron(config)
 

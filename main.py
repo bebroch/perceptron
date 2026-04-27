@@ -1,5 +1,4 @@
-from perceptron import Normalize, Perceptron
-import numpy as np
+from perceptron import Config, LayersConfig, Normalize, Perceptron, TrainData, TrainInfo
 import numpy as np
 
 normalizer = Normalize(input_start=0,
@@ -8,22 +7,27 @@ normalizer = Normalize(input_start=0,
                        output_end=5)
 
 
-config = {
-    "learning_rate": 0.1,
-    "layers_config": [
+config: Config = Config(
+    learning_rate=0.1,
+    layers_config=LayersConfig(layers_config=[
         (4, 3),
         (3, 3),
         (3, 1)
-    ],
-    "train_data_info": {
-        "input_data_index": (0, 4),
-        "targets_index": (4, 5)
-    }
-}
+    ], scale=1.0),
+    train_data_info=TrainInfo(input_data_index=(0, 4), targets_index=(4, 5)))
+
 
 perc = Perceptron(config)
 
-training_data: np._ArrayFloat64_co = normalizer.normalize_train_data(
+
+normalized_data = normalizer.normalize_train_data(input_data, targets)
+training_data: TrainData = TrainData(
+    data=normalized_data,
+    batch_size=len(normalized_data)
+)
+
+
+normalizer.normalize_train_data(
     input_data, targets)
 
-perc.train(training_data, batch_size=len(training_data), epochs=7000)
+perc.train(training_data,  epochs=7000)

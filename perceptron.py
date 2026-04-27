@@ -1,4 +1,55 @@
+from dataclasses import dataclass
+from typing import Optional
 import numpy as np
+
+
+@dataclass
+class TrainInfo:
+    input_data_index: tuple[int, int]
+    targets_index: tuple[int, int]
+
+    def get_input_start(self):
+        return self.input_data_index[0]
+
+    def get_input_end(self):
+        return self.input_data_index[1]
+
+    def get_target_start(self):
+        return self.targets_index[0]
+
+    def get_target_end(self):
+        return self.targets_index[1]
+
+
+@dataclass
+class LayersConfig:
+    layers_config: list[tuple[int, int]]
+    scale: float
+
+    def get_first_layer(self) -> tuple[int, int]:
+        return self.layers_config[0]
+
+    def get_last_layer(self) -> tuple[int, int]:
+        return self.layers_config[-1]
+
+
+@dataclass
+class Config:
+    learning_rate: float
+    layers_config: LayersConfig
+    train_data_info: TrainInfo
+
+
+@dataclass
+class TrainData:
+    data: np._ArrayFloat64_co
+    batch_size: int
+
+    def shuffle(self):
+        np.random.shuffle(self.data)
+
+    def get_batch(self):
+        return self.data[0:self.batch_size]
 
 
 class Layer:
@@ -81,8 +132,9 @@ class LayerWrapper(Layer):
             neurons_in_layer: int,
             prev_layer_of_neurons: int,
             learning_rate: float,
+            scale: float = 1,
             prev_layer: LayerWrapper | None = None):
-        limit = np.sqrt(6 / (neurons_input + neurons_out))
+        limit = np.sqrt(6 / (neurons_input + neurons_out)) * scale
 
         W = np.random.normal(loc=0, scale=limit, size=(
             prev_layer_of_neurons, neurons_in_layer))
@@ -92,56 +144,44 @@ class LayerWrapper(Layer):
 
 
 class Perceptron:
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: Config) -> None:
         self.layers: list[LayerWrapper] = []
 
-        self.learning_rate: float = config["learning_rate"]
-        self.train_data_info: dict = config["train_data_info"]
-        # self.create_layers()
-        self._create_rand_layers(config["layers_config"])
+        self.learning_rate: float = config.learning_rate
+        self.train_info: TrainInfo = config.train_data_info
+        self.create_rand_layers(config.layers_config)
 
-    def _create_rand_layers(self, layers_config):
-        neurons_input = layers_config[0][0]
-        neurons_out = layers_config[-1][1]
+    def create_rand_layers(self, layers_config: LayersConfig):
+        neurons_input = layers_config.get_first_layer()[0]
+        neurons_out = layers_config.get_last_layer()[1]
 
         prev_layer = None
 
-        for _, (weight_length, neuron_length) in enumerate(layers_config):
+        learning_rate = self.learning_rate
+        scale = layers_config.scale
+        for _, (weight_length, neuron_length) in enumerate(layers_config.layers_config):
             layer = LayerWrapper.get_layer_with_random_weight(neurons_input=neurons_input,
                                                               neurons_out=neurons_out,
                                                               neurons_in_layer=neuron_length,
                                                               prev_layer_of_neurons=weight_length,
-                                                              learning_rate=0.1,
+                                                              learning_rate=learning_rate,
+                                                              scale=scale,
                                                               prev_layer=prev_layer)
             self.layers.append(layer)
             prev_layer = layer
 
-    def create_layers(self):
-        W1 = np.array([[0.8, -0.5, 0.3], [-0.2, 0.6, -0.9]])
-        W2 = np.array([[0.4], [-0.3], [0.7]])
-        b1 = np.array([[0.01, 0.01, 0.01]])
-        b2 = np.array([[0.01]])
-        layer1 = LayerWrapper(W=W1, b=b1, learning_rate=0.5)
-        layer2 = LayerWrapper(
-            W=W2, b=b2, learning_rate=0.5, prev_layer=layer1)
-
-        self.layers.append(layer1)
-        self.layers.append(layer2)
-
-    def train(self, train_data: np._ArrayFloat64_co, batch_size: int, epochs=1):
+    def train(self, train_data: TrainData, epochs=1):
         """
         train_data: [
             [[input_data], [targets]],
             ...
         ]
         """
-        input_start = self.train_data_info["input_data_index"][0]
-        input_end = self.train_data_info["input_data_index"][1]
-        target_start = self.train_data_info["targets_index"][0]
-        target_end = self.train_data_info["targets_index"][1]
 
-        def get_batch():
-            return train_data[0:batch_size]
+        input_start = self.train_info.get_input_start()
+        input_end = self.train_info.get_input_end()
+        target_start = self.train_info.get_target_start()
+        target_end = self.train_info.get_target_end()
 
         def get_input_data(data):
             return np.array([data[input_start:input_end]])
@@ -149,20 +189,26 @@ class Perceptron:
         def get_targets(data):
             return np.array([data[target_start:target_end]])
 
+        def progress_training(epoch_idx):
+            if (epoch_idx + 1) % max(epochs//10, 1) != 0:
+                return
+
+            if perceptron_cost is None:
+                raise Exception("perceptron_cost is None")
+
+            print(
+                f"{epoch_idx + 1}/{epochs} epochs done, cost = {perceptron_cost[0][0]}")
+
         perceptron_cost = None
         for epoch_idx in range(epochs):
-            np.random.shuffle(train_data)
-            batch_data = get_batch()
+            train_data.shuffle()
+            batch_data = train_data.get_batch()
 
             for data in batch_data:
                 perceptron_cost = self.epoch(
                     get_input_data(data), get_targets(data))
 
-            if (epoch_idx + 1) % max(epochs//10, 1) == 0:
-                if perceptron_cost is None:
-                    raise Exception("perceptron_cost is None")
-                print(
-                    f"{epoch_idx + 1}/{epochs} epochs done, cost = {perceptron_cost[0][0]}")
+            progress_training(epoch_idx)
 
     def epoch(self, input_data, target):
         out = input_data
