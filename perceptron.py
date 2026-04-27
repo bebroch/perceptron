@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 import numpy as np
+from numba import njit, prange
 
 
 @dataclass
@@ -61,11 +62,28 @@ class Layer:
         return 1 / (1 + np.exp(-x))
 
     def get_z(self, x):
-        return x @ self.W + self.b
+        return fast_get_z(x, self.W, self.b)
 
     def get_a(self, x):
         """а = σ(z) = σ(W*x + b)"""
         return self.sigmoid(self.get_z(x))
+
+
+@njit(nogil=True)
+def fast_dot(a, b):
+    return a.T @ b
+
+
+@njit(nogil=True)
+def fast_get_z(x, W, b):
+    return x @ W + b
+
+
+@njit(nogil=True)
+def fast_fix_error(W, b, learning_rate, dE_dW, dE_db):
+    W = W - learning_rate * dE_dW
+    b = b - learning_rate * dE_db
+    return W, b
 
 
 class LayerWrapper(Layer):
@@ -101,15 +119,13 @@ class LayerWrapper(Layer):
         if prev_a is None:
             raise Exception("current_a is must be set")
 
-        dE_dW = prev_a.T @ dE_dZ
+        dE_dW = fast_dot(prev_a, dE_dZ)
         dE_db = dE_dZ
         return (dE_dW, dE_db)
 
     def fix_error(self, dE_dW, dE_db):
-        W = self.W
-        b = self.b
-        self.W = W - self.learning_rate * dE_dW
-        self.b = b - self.learning_rate * dE_db
+        self.W, self.b = fast_fix_error(
+            self.W, self.b, self.learning_rate, dE_dW, dE_db)
 
     def back_propagation(self, dE_dy_pred):
         """dE_dy_pred = y_pred - y_true"""
