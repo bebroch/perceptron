@@ -38,6 +38,7 @@ class Config:
     learning_rate: float
     layers_config: LayersConfig
     train_data_info: TrainInfo
+    is_get_information_about_cost: bool = False
 
 
 @dataclass
@@ -147,6 +148,8 @@ class Perceptron:
     def __init__(self, config: Config) -> None:
         self.layers: list[LayerWrapper] = []
 
+        self.is_get_information_about_cost = config.is_get_information_about_cost
+
         self.learning_rate: float = config.learning_rate
         self.train_info: TrainInfo = config.train_data_info
         self.create_rand_layers(config.layers_config)
@@ -210,6 +213,67 @@ class Perceptron:
 
             progress_training(epoch_idx)
 
+    def train_to_cost(self, train_data: TrainData, cost_threshold=0.01, cost_overflow=10, max_epochs=25000):
+        input_start = self.train_info.get_input_start()
+        input_end = self.train_info.get_input_end()
+        target_start = self.train_info.get_target_start()
+        target_end = self.train_info.get_target_end()
+
+        def get_input_data(data):
+            return np.array([data[input_start:input_end]])
+
+        def get_targets(data):
+            return np.array([data[target_start:target_end]])
+
+        def progress_training(epoch_idx):
+            if not self.is_get_information_about_cost:
+                return
+
+            if (epoch_idx + 1) % max(max_epochs/5//10, 1) != 0:
+                return
+
+            print(
+                f"{epoch_idx + 1} epochs done, cost = {perceptron_costs[-1]}")
+
+        def isPerceptronCostMoreThanThreshold():
+            for cost in perceptron_costs:
+                if cost > cost_threshold:
+                    return True
+            return False
+
+        def isCostsOverflow():
+            return len(perceptron_costs) > cost_overflow
+
+        perceptron_costs = []
+        epoch_idx = 0
+        while epoch_idx <= max_epochs:
+            train_data.shuffle()
+            batch_data = train_data.get_batch()
+
+            perc_cost_sum = 0
+            for data in batch_data:
+                perc_cost = self.epoch(get_input_data(data), get_targets(data))
+                perc_cost_sum += perc_cost[0][0]
+
+            perceptron_costs.append(perc_cost_sum / len(batch_data))
+
+            if not isPerceptronCostMoreThanThreshold():
+                if self.is_get_information_about_cost:
+                    print(
+                        f"training done, epochs: {epoch_idx}, cost: {perceptron_costs[-1]}")
+                return epoch_idx
+
+            if isCostsOverflow():
+                perceptron_costs.pop(0)
+
+            progress_training(epoch_idx)
+            epoch_idx += 1
+
+        if self.is_get_information_about_cost:
+            print(
+                f"training not done, epochs: {epoch_idx}, cost: {perceptron_costs[-1]}")
+        return epoch_idx
+
     def epoch(self, input_data, target):
         out = input_data
         for layer in self.layers:
@@ -218,9 +282,20 @@ class Perceptron:
         self.layers[-1].back_propagation(out - target)
         return (out - target)**2
 
-    def cost_func(self, input_data, target):
-        predict = self.predict(input_data)
-        cost = (predict - target)**2
+    def cost_func(self, data: np._ArrayFloat64_co):
+        input_start = self.train_info.get_input_start()
+        input_end = self.train_info.get_input_end()
+        target_start = self.train_info.get_target_start()
+        target_end = self.train_info.get_target_end()
+
+        def get_input_data():
+            return np.array([data[input_start:input_end]])
+
+        def get_targets():
+            return np.array([data[target_start:target_end]])
+
+        predict = self.predict(get_input_data())
+        cost = (predict - get_targets())**2
         return cost[0][0]
 
     def predict(self, predict_data):

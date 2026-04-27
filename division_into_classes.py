@@ -22,7 +22,8 @@ def train_perc():
         batch_size=len(normalized_data)
     )
 
-    perc.train(training_data, epochs=500)
+    perc.train_to_cost(training_data, cost_threshold=1e-2,
+                       cost_overflow=10, max_epochs=25000)
 
 
 perceptron_points = []
@@ -85,7 +86,7 @@ normalizer.set_max_normalize_matrix_2(np.array([10, 10, 1]))
 
 
 config: Config = Config(
-    learning_rate=0.1,
+    learning_rate=0.5,
     layers_config=LayersConfig(
         layers_config=[
             (2, 3),

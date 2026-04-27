@@ -1,6 +1,6 @@
 
 
-from perceptron import Normalize, Perceptron
+from perceptron import Config, LayersConfig, Normalize, Perceptron, TrainInfo
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -39,19 +39,21 @@ normalizer = Normalize(input_start=0,
 
 
 def test(learning_rate, neuron_count, epoch):
-    config = {
-        "learning_rate": learning_rate,
-        "layers_config": [
-            (4, 3),
-            (3, 3),
-            (3, neuron_count),
-            (neuron_count, 1)
-        ],
-        "train_data_info": {
-            "input_data_index": (0, 4),
-            "targets_index": (4, 5)
-        }
-    }
+    config: Config = Config(
+        learning_rate=learning_rate,
+        layers_config=LayersConfig(
+            layers_config=[
+                (4, 3),
+                (3, 3),
+                (3, neuron_count),
+                (neuron_count, 1)
+            ],
+            scale=1.0),
+        train_data_info=TrainInfo(
+            input_data_index=(0, 4),
+            targets_index=(4, 5)
+        )
+    )
 
     perc = Perceptron(config)
 
