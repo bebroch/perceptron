@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 import numpy as np
 
@@ -23,14 +23,10 @@ class TrainInfo:
 
 @dataclass
 class LayersConfig:
-    layers_config: list[tuple[int, int]]
-    scale: float
-
-    def get_first_layer(self) -> tuple[int, int]:
-        return self.layers_config[0]
-
-    def get_last_layer(self) -> tuple[int, int]:
-        return self.layers_config[-1]
+    input_neurons: int
+    output_neurons: int
+    scale: float = 1.0
+    hidden_neurons: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -155,21 +151,24 @@ class Perceptron:
         self.create_rand_layers(config.layers_config)
 
     def create_rand_layers(self, layers_config: LayersConfig):
-        neurons_input = layers_config.get_first_layer()[0]
-        neurons_out = layers_config.get_last_layer()[1]
+        neurons_input = layers_config.input_neurons
+        neurons_out = layers_config.output_neurons
 
         prev_layer = None
 
         learning_rate = self.learning_rate
         scale = layers_config.scale
-        for _, (weight_length, neuron_length) in enumerate(layers_config.layers_config):
+
+        prev_neuron_count = layers_config.input_neurons
+        for neuron_count in layers_config.hidden_neurons + [layers_config.output_neurons]:
             layer = LayerWrapper.get_layer_with_random_weight(neurons_input=neurons_input,
                                                               neurons_out=neurons_out,
-                                                              neurons_in_layer=neuron_length,
-                                                              prev_layer_of_neurons=weight_length,
+                                                              neurons_in_layer=neuron_count,
+                                                              prev_layer_of_neurons=prev_neuron_count,
                                                               learning_rate=learning_rate,
                                                               scale=scale,
                                                               prev_layer=prev_layer)
+            prev_neuron_count = neuron_count
             self.layers.append(layer)
             prev_layer = layer
 

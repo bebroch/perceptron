@@ -33,12 +33,10 @@ normalizer = Normalize(input_start=0,
 
 config: Config = Config(
     learning_rate=0.1,
-    layers_config=LayersConfig(layers_config=[
-        (4, 3),
-        (3, 5),
-        (5, 5),
-        (5, 1)
-    ], scale=1.0),
+    layers_config=LayersConfig(
+        input_neurons=4,
+        output_neurons=1,
+        scale=1.0),
     train_data_info=TrainInfo(input_data_index=(0, 4), targets_index=(4, 5)))
 
 

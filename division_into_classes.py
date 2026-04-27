@@ -23,7 +23,7 @@ def train_perc():
     )
 
     perc.train_to_cost(training_data, cost_threshold=1e-2,
-                       cost_overflow=10, max_epochs=25000)
+                       cost_overflow=10, max_epochs=10000)
 
 
 perceptron_points = []
@@ -73,6 +73,7 @@ def on_click(event):
         fig.canvas.draw_idle()
 
     elif event.button is MouseButton.MIDDLE:
+        pass
         train_perc()
         construct_curve()
 
@@ -86,19 +87,17 @@ normalizer.set_max_normalize_matrix_2(np.array([10, 10, 1]))
 
 
 config: Config = Config(
-    learning_rate=0.5,
+    learning_rate=0.4,
     layers_config=LayersConfig(
-        layers_config=[
-            (2, 3),
-            (3, 10),
-            (10, 10),
-            (10, 1)
-        ],
+        input_neurons=2,
+        hidden_neurons=[10, 10, 10, 10],
+        output_neurons=1,
         scale=1.0),
     train_data_info=TrainInfo(
         input_data_index=(0, 2),
         targets_index=(2, 3)
-    )
+    ),
+    is_get_information_about_cost=True
 )
 
 
